@@ -131,11 +131,9 @@ impl AzureProvider {
             // Set the correct header based on authentication type
             match self.auth.credential_type() {
                 super::azureauth::AzureCredentials::ApiKey(_) => {
-                    tracing::debug!("Using API key authentication");
                     request_builder = request_builder.header("api-key", token_value.clone());
                 }
                 super::azureauth::AzureCredentials::DefaultCredential => {
-                    tracing::debug!("Using Azure default credential authentication");
                     request_builder = request_builder.header(
                         "Authorization",
                         format!("Bearer {}", token_value.clone()),
@@ -143,46 +141,12 @@ impl AzureProvider {
                 }
             }
 
-            tracing::debug!(
-                "Sending request to Azure OpenAI (attempt {}): {} with payload: {:?}",
-                attempts + 1,
-                base_url,
-                payload
-            );
-
-            // Log request details before sending
-            tracing::debug!(
-                "Request details:\n\
-                 - URL: {}\n\
-                 - Deployment: {}\n\
-                 - API Version: {}\n\
-                 - Auth Type: {:?}",
-                base_url,
-                self.deployment_name,
-                self.api_version,
-                self.auth.credential_type(),
-            );
-
             let response_result = request_builder.json(&payload).send().await;
             
             match response_result {
                 Ok(response) => {
-                    let status = response.status();
-                    let headers = response.headers().clone();
-                    
-                    tracing::debug!(
-                        "Received response from Azure OpenAI (attempt {}): Status: {}, Headers: {:?}",
-                        attempts + 1,
-                        status,
-                        headers
-                    );
-
                     match handle_response_openai_compat(response).await {
                         Ok(result) => {
-                            tracing::debug!(
-                                "Successfully received response from Azure OpenAI after {} attempts",
-                                attempts + 1
-                            );
                             return Ok(result);
                         }
                         Err(ProviderError::RateLimitExceeded(msg)) => {
@@ -200,19 +164,10 @@ impl AzureProvider {
                             };
 
                             let delay = if retry_after > 0 {
-                                tracing::debug!(
-                                    "Using server-provided retry-after value: {} seconds",
-                                    retry_after
-                                );
                                 Duration::from_secs(retry_after)
                             } else {
                                 let delay = current_delay.min(DEFAULT_MAX_RETRY_INTERVAL_MS);
                                 current_delay = (current_delay as f64 * DEFAULT_BACKOFF_MULTIPLIER) as u64;
-                                tracing::debug!(
-                                    "Using exponential backoff delay: {} ms (next delay will be {} ms)",
-                                    delay,
-                                    current_delay
-                                );
                                 Duration::from_millis(delay)
                             };
 
@@ -244,14 +199,6 @@ impl AzureProvider {
                         attempts += 1;
                         let delay = current_delay.min(DEFAULT_MAX_RETRY_INTERVAL_MS);
                         current_delay = (current_delay as f64 * DEFAULT_BACKOFF_MULTIPLIER) as u64;
-                        
-                        tracing::debug!(
-                            "Request timeout (attempt {}/{}). Retrying after {} ms...",
-                            attempts,
-                            DEFAULT_MAX_RETRIES,
-                            delay
-                        );
-                        
                         sleep(Duration::from_millis(delay)).await;
                         continue;
                     }
@@ -299,26 +246,19 @@ impl Provider for AzureProvider {
         messages: &[Message],
         tools: &[Tool],
     ) -> Result<(Message, ProviderUsage), ProviderError> {
-        tracing::info!("AzureProvider::complete called");
         let payload = create_request(&self.get_model_config(), system, messages, tools, &ImageFormat::OpenAi)?;
-        tracing::info!("AzureProvider::complete: Payload created, calling post...");
         let response = self.post(payload.clone()).await?;
-        tracing::info!("AzureProvider::complete: Post finished, processing response...");
 
         let message = response_to_message(response.clone())?;
-        tracing::info!("AzureProvider::complete: Message extracted");
         let usage = match get_usage(&response) {
             Ok(usage) => usage,
             Err(ProviderError::UsageError(e)) => {
-                tracing::debug!("Failed to get usage data: {}", e);
                 Usage::default()
             }
             Err(e) => return Err(e),
         };
-        tracing::info!("AzureProvider::complete: Usage extracted");
         let model = get_model(&response);
         emit_debug_trace(&self.get_model_config(), &payload, &response, &usage);
-        tracing::info!("AzureProvider::complete: Returning Ok");
         Ok((message, ProviderUsage::new(model, usage)))
     }
 }

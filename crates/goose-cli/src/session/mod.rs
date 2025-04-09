@@ -623,6 +623,7 @@ impl Session {
                 result = stream.next() => {
                     match result {
                         Some(Ok(message)) => {
+                            tracing::info!("process_agent_response: Received Ok(message)");
                             // If it's a confirmation request, get approval but otherwise do not render/persist
                             if let Some(MessageContent::ToolConfirmationRequest(confirmation)) = message.content.first() {
                                 output::hide_thinking();
@@ -674,6 +675,7 @@ impl Session {
                             }
                         }
                         Some(Err(e)) => {
+                            tracing::error!("process_agent_response: Received Err: {}", e);
                             eprintln!("Error: {}", e);
                             drop(stream);
                             if let Err(e) = self.handle_interrupted_messages(false).await {
@@ -687,7 +689,10 @@ impl Session {
                             );
                             break;
                         }
-                        None => break,
+                        None => {
+                            tracing::info!("process_agent_response: Received None (stream ended)");
+                            break
+                        },
                     }
                 }
                 _ = tokio::signal::ctrl_c() => {

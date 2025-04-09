@@ -253,6 +253,7 @@ impl Provider for AzureProvider {
         let usage = match get_usage(&response) {
             Ok(usage) => usage,
             Err(ProviderError::UsageError(e)) => {
+                tracing::debug!("Failed to get usage data: {}", e);
                 Usage::default()
             }
             Err(e) => return Err(e),

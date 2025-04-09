@@ -163,62 +163,31 @@ impl AzureProvider {
                 self.auth.credential_type(),
             );
 
-            // Log the raw HTTP request details
-            tracing::warn!(
-                "Raw HTTP Request (attempt {}):\nMethod: POST\nURL: {}\nHeaders:\n    Content-Type: application/json\n    {}: {}\nPayload: {:#}",
-                attempts + 1,
-                base_url,
-                match self.auth.credential_type() {
-                    super::azureauth::AzureCredentials::ApiKey(_) => "api-key",
-                    super::azureauth::AzureCredentials::DefaultCredential => "Authorization",
-                },
-                match self.auth.credential_type() {
-                    super::azureauth::AzureCredentials::ApiKey(_) => token_value,
-                    super::azureauth::AzureCredentials::DefaultCredential => format!("Bearer {}", token_value),
-                },
-                serde_json::to_string_pretty(&payload).unwrap_or_else(|_| format!("{:?}", payload))
-            );
-
             let response_result = request_builder.json(&payload).send().await;
-            
-            // Log the raw response result
-            tracing::warn!(
-                "Raw response result from Azure OpenAI (attempt {}): {:?}",
-                attempts + 1,
-                response_result
-            );
             
             match response_result {
                 Ok(response) => {
                     let status = response.status();
                     let headers = response.headers().clone();
                     
-                    tracing::warn!(
-                        "Raw response details:\nStatus: {}\nHeaders: {:?}\nResponse: {:?}",
+                    tracing::debug!(
+                        "Received response from Azure OpenAI (attempt {}): Status: {}, Headers: {:?}",
+                        attempts + 1,
                         status,
-                        headers,
-                        response
+                        headers
                     );
 
                     match handle_response_openai_compat(response).await {
                         Ok(result) => {
-                            tracing::info!(
+                            tracing::debug!(
                                 "Successfully received response from Azure OpenAI after {} attempts",
                                 attempts + 1
                             );
-                            tracing::debug!("Response content: {:?}", result);
                             return Ok(result);
                         }
                         Err(ProviderError::RateLimitExceeded(msg)) => {
                             attempts += 1;
                             last_error = Some(ProviderError::RateLimitExceeded(msg.clone()));
-
-                            tracing::warn!(
-                                "Rate limit error from Azure OpenAI (attempt {}/{}): {}",
-                                attempts,
-                                DEFAULT_MAX_RETRIES,
-                                msg
-                            );
 
                             let retry_after = if let Some(secs) = msg.to_lowercase().find("try again in ") {
                                 msg[secs..]
@@ -231,7 +200,7 @@ impl AzureProvider {
                             };
 
                             let delay = if retry_after > 0 {
-                                tracing::info!(
+                                tracing::debug!(
                                     "Using server-provided retry-after value: {} seconds",
                                     retry_after
                                 );
@@ -239,7 +208,7 @@ impl AzureProvider {
                             } else {
                                 let delay = current_delay.min(DEFAULT_MAX_RETRY_INTERVAL_MS);
                                 current_delay = (current_delay as f64 * DEFAULT_BACKOFF_MULTIPLIER) as u64;
-                                tracing::info!(
+                                tracing::debug!(
                                     "Using exponential backoff delay: {} ms (next delay will be {} ms)",
                                     delay,
                                     current_delay
@@ -247,23 +216,14 @@ impl AzureProvider {
                                 Duration::from_millis(delay)
                             };
 
-                            tracing::warn!(
-                                "Rate limit exceeded (attempt {}/{}). Retrying after {:?}...",
-                                attempts,
-                                DEFAULT_MAX_RETRIES,
-                                delay
-                            );
-
                             sleep(delay).await;
                             continue;
                         }
                         Err(e) => {
                             tracing::error!(
-                                "Error response from Azure OpenAI (attempt {}): {:?}\nStatus: {}\nHeaders: {:?}",
+                                "Error response from Azure OpenAI (attempt {}): {:?}",
                                 attempts + 1,
-                                e,
-                                status,
-                                headers
+                                e
                             );
                             return Err(e);
                         }
@@ -285,7 +245,7 @@ impl AzureProvider {
                         let delay = current_delay.min(DEFAULT_MAX_RETRY_INTERVAL_MS);
                         current_delay = (current_delay as f64 * DEFAULT_BACKOFF_MULTIPLIER) as u64;
                         
-                        tracing::warn!(
+                        tracing::debug!(
                             "Request timeout (attempt {}/{}). Retrying after {} ms...",
                             attempts,
                             DEFAULT_MAX_RETRIES,

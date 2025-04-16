@@ -21,7 +21,7 @@ Goose relies heavily on tool calling capabilities and currently works best with 
 |-----------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | [Amazon Bedrock](https://aws.amazon.com/bedrock/)                           | Offers a variety of foundation models, including Claude, Jurassic-2, and others. **AWS environment variables must be set in advance, not configured through `goose configure`**                                           | `AWS_PROFILE`, or `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, ...                                                                                                   |
 | [Anthropic](https://www.anthropic.com/)                                     | Offers Claude, an advanced AI model for natural language tasks.                                                                                                                                                           | `ANTHROPIC_API_KEY`, `ANTHROPIC_HOST` (optional)                                                                                                                                                                 |
-| [Azure OpenAI](https://learn.microsoft.com/en-us/azure/ai-services/openai/) | Access Azure-hosted OpenAI models, including GPT-4 and GPT-3.5.                                                                                                                                                           | `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_DEPLOYMENT_NAME`                                                                                                     |
+| [Azure OpenAI](https://learn.microsoft.com/en-us/azure/ai-services/openai/) | Access Azure-hosted OpenAI models, including GPT-4 and GPT-3.5. Supports both API key and Azure credential chain authentication.                                                                                          | `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_DEPLOYMENT_NAME`, `AZURE_OPENAI_API_KEY` (optional)                                                                                           |
 | [Databricks](https://www.databricks.com/)                                   | Unified data analytics and AI platform for building and deploying models.                                                                                                                                                 | `DATABRICKS_HOST`, `DATABRICKS_TOKEN`                                                                                                                                               |
 | [Gemini](https://ai.google.dev/gemini-api/docs)                             | Advanced LLMs by Google with multimodal capabilities (text, images).                                                                                                                                                      | `GOOGLE_API_KEY`                                                                                                                                                                    |
 | [GCP Vertex AI](https://cloud.google.com/vertex-ai)                         | Google Cloud's Vertex AI platform, supporting Gemini and Claude models. **Credentials must be configured in advance. Follow the instructions at https://cloud.google.com/vertex-ai/docs/authentication.**                 | `GCP_PROJECT_ID`, `GCP_LOCATION` and optional `GCP_MAX_RETRIES` (6), `GCP_INITIAL_RETRY_INTERVAL_MS` (5000), `GCP_BACKOFF_MULTIPLIER` (2.0), `GCP_MAX_RETRY_INTERVAL_MS` (320_000). |
@@ -200,6 +200,95 @@ Goose supports using custom OpenAI-compatible endpoints, which is particularly u
 For enterprise deployments, you can pre-configure these values using environment variables or configuration files to ensure consistent governance across your organization.
 :::
 
+## Using Azure OpenAI with Credential Chain Authentication
+
+Goose supports two authentication methods for Azure OpenAI:
+
+1. **API Key Authentication**: Traditional authentication using an API key
+2. **Azure Credential Chain**: Authenticate using Azure CLI credentials or other Azure identity providers
+
+### Azure Credential Chain Benefits
+
+- **Simplified Authentication**: No need to manage API keys
+- **Enhanced Security**: Leverage Azure's robust identity and access management
+- **Token Auto-renewal**: Credentials are automatically refreshed
+- **Integrated Identity Management**: Works with Azure Active Directory roles and permissions
+
+### Configuration Parameters
+
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `AZURE_OPENAI_ENDPOINT` | Yes | Your Azure OpenAI service endpoint URL |
+| `AZURE_OPENAI_DEPLOYMENT_NAME` | Yes | The name of your model deployment |
+| `AZURE_OPENAI_API_VERSION` | No | API version (defaults to "2024-10-21") |
+| `AZURE_OPENAI_API_KEY` | No | API key (if not provided, Azure credential chain will be used) |
+
+### Setup Instructions
+
+<Tabs groupId="azure-auth">
+  <TabItem value="credential-chain" label="Using Azure Credential Chain" default>
+    
+    **Prerequisites**:
+    1. Ensure you have the Azure CLI installed: [Install Azure CLI](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli)
+    2. Log in to your Azure account:
+       ```sh
+       az login
+       ```
+    3. Verify you have appropriate permissions for the Azure OpenAI service
+    
+    **Configuration**:
+    1. Run `goose configure`
+    2. Select `Configure Providers`
+    3. Choose `Azure OpenAI` as the provider
+    4. Enter your Azure OpenAI endpoint and deployment name
+    5. Leave the API key field empty to use Azure credential chain
+    6. Select your model of choice
+    
+    ```bash
+    # Example configuration
+    AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com
+    AZURE_OPENAI_DEPLOYMENT_NAME=your-deployment-name
+    # No API key needed - will use Azure credential chain
+    ```
+  </TabItem>
+  
+  <TabItem value="api-key" label="Using API Key">
+    
+    **Configuration**:
+    1. Obtain your API key from the Azure portal
+    2. Run `goose configure`
+    3. Select `Configure Providers`
+    4. Choose `Azure OpenAI` as the provider
+    5. Enter your Azure OpenAI endpoint, deployment name, and API key
+    6. Select your model of choice
+    
+    ```bash
+    # Example configuration
+    AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com
+    AZURE_OPENAI_DEPLOYMENT_NAME=your-deployment-name
+    AZURE_OPENAI_API_KEY=your-api-key
+    ```
+  </TabItem>
+</Tabs>
+
+### Troubleshooting Azure Authentication
+
+If you encounter authentication issues:
+
+1. **For Credential Chain**:
+   - Ensure you're logged in with `az login`
+   - Verify your account has appropriate role assignments (e.g., "Cognitive Services OpenAI User")
+   - Check that your Azure subscription has access to the Azure OpenAI service
+
+2. **For API Key**:
+   - Verify your API key is correct and has not expired
+   - Ensure the API key has appropriate permissions for the deployment
+   - Check if IP restrictions are in place for your Azure OpenAI service
+
+:::tip
+You can switch between authentication methods at any time by running `goose configure` again and either providing or omitting the API key.
+:::
+
 ## Using Goose for Free
 
 Goose is a free and open source AI agent that you can start using right away, but not all supported [LLM Providers][providers] provide a free tier. 
@@ -276,192 +365,3 @@ Example:
 ```sh
 ollama run qwen2.5
 ```
-
-3. In a separate terminal window, configure with Goose:
-
-```sh
-goose configure
-```
-
-4. Choose to `Configure Providers`
-
-```
-┌   goose-configure 
-│
-◆  What would you like to configure?
-│  ● Configure Providers (Change provider or update credentials)
-│  ○ Toggle Extensions 
-│  ○ Add Extension 
-└  
-```
-
-5. Choose `Ollama` as the model provider
-
-```
-┌   goose-configure 
-│
-◇  What would you like to configure?
-│  Configure Providers 
-│
-◆  Which model provider should we use?
-│  ○ Anthropic 
-│  ○ Databricks 
-│  ○ Google Gemini 
-│  ○ Groq 
-│  ● Ollama (Local open source models)
-│  ○ OpenAI 
-│  ○ OpenRouter 
-└  
-```
-
-5. Enter the host where your model is running
-
-:::info Endpoint
-For Ollama, if you don't provide a host, we set it to `localhost:11434`. When constructing the URL, we preprend `http://` if the scheme is not `http` or `https`. If you're running Ollama on port 80 or 443, you'll have to set `OLLMA_HOST=http://host:{port}`
-:::
-
-```
-┌   goose-configure 
-│
-◇  What would you like to configure?
-│  Configure Providers 
-│
-◇  Which model provider should we use?
-│  Ollama 
-│
-◆  Provider Ollama requires OLLAMA_HOST, please enter a value
-│  http://localhost:11434
-└
-```
-
-
-6. Enter the model you have running
-
-```
-┌   goose-configure 
-│
-◇  What would you like to configure?
-│  Configure Providers 
-│
-◇  Which model provider should we use?
-│  Ollama 
-│
-◇  Provider Ollama requires OLLAMA_HOST, please enter a value
-│  http://localhost:11434
-│
-◇  Enter a model from that provider:
-│  qwen2.5
-│
-◇  Welcome! You're all set to explore and utilize my capabilities. Let's get started on solving your problems together!
-│
-└  Configuration saved successfully
-```
-
-### DeepSeek-R1
-
-Ollama provides open source LLMs, such as `DeepSeek-r1`, that you can install and run locally.
-Note that the native `DeepSeek-r1` model doesn't support tool calling, however, we have a [custom model](https://ollama.com/michaelneale/deepseek-r1-goose) you can use with Goose. 
-
-:::warning
-Note that this is a 70B model size and requires a powerful device to run smoothly.
-:::
-
-
-1. Download and install Ollama from [ollama.com](https://ollama.com/download).
-2. In a terminal window, run the following command to install the custom DeepSeek-r1 model:
-
-```sh
-ollama run michaelneale/deepseek-r1-goose
-```
-
-<Tabs groupId="interface">
-  <TabItem value="cli" label="Goose CLI" default>
-    3. In a separate terminal window, configure with Goose:
-
-    ```sh
-    goose configure
-    ```
-
-    4. Choose to `Configure Providers`
-
-    ```
-    ┌   goose-configure 
-    │
-    ◆  What would you like to configure?
-    │  ● Configure Providers (Change provider or update credentials)
-    │  ○ Toggle Extensions 
-    │  ○ Add Extension 
-    └  
-    ```
-
-    5. Choose `Ollama` as the model provider
-
-    ```
-    ┌   goose-configure 
-    │
-    ◇  What would you like to configure?
-    │  Configure Providers 
-    │
-    ◆  Which model provider should we use?
-    │  ○ Anthropic 
-    │  ○ Databricks 
-    │  ○ Google Gemini 
-    │  ○ Groq 
-    │  ● Ollama (Local open source models)
-    │  ○ OpenAI 
-    │  ○ OpenRouter 
-    └  
-    ```
-
-    5. Enter the host where your model is running
-
-    ```
-    ┌   goose-configure 
-    │
-    ◇  What would you like to configure?
-    │  Configure Providers 
-    │
-    ◇  Which model provider should we use?
-    │  Ollama 
-    │
-    ◆  Provider Ollama requires OLLAMA_HOST, please enter a value
-    │  http://localhost:11434
-    └
-    ```
-
-    6. Enter the installed model from above
-
-    ```
-    ┌   goose-configure 
-    │
-    ◇  What would you like to configure?
-    │  Configure Providers 
-    │
-    ◇  Which model provider should we use?
-    │  Ollama 
-    │
-    ◇   Provider Ollama requires OLLAMA_HOST, please enter a value
-    │  http://localhost:11434  
-    │    
-    ◇  Enter a model from that provider:
-    │  michaelneale/deepseek-r1-goose
-    │
-    ◇  Welcome! You're all set to explore and utilize my capabilities. Let's get started on solving your problems together!
-    │
-    └  Configuration saved successfully
-    ```
-  </TabItem>
-  <TabItem value="ui" label="Goose Desktop">
-    3. Click `...` in the top-right corner.
-    4. Navigate to `Settings` -> `Browse Models` -> and select `Ollama` from the list.
-    5. Enter `michaelneale/deepseek-r1-goose` for the model name.
-  </TabItem>
-</Tabs>
-
----
-
-If you have any questions or need help with a specific provider, feel free to reach out to us on [Discord](https://discord.gg/block-opensource) or on the [Goose repo](https://github.com/block/goose).
-
-
-[providers]: /docs/getting-started/providers
-[function-calling-leaderboard]: https://gorilla.cs.berkeley.edu/leaderboard.html

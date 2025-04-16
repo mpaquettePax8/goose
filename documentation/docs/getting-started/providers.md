@@ -200,95 +200,6 @@ Goose supports using custom OpenAI-compatible endpoints, which is particularly u
 For enterprise deployments, you can pre-configure these values using environment variables or configuration files to ensure consistent governance across your organization.
 :::
 
-## Using Azure OpenAI with Credential Chain Authentication
-
-Goose supports two authentication methods for Azure OpenAI:
-
-1. **API Key Authentication**: Traditional authentication using an API key
-2. **Azure Credential Chain**: Authenticate using Azure CLI credentials or other Azure identity providers
-
-### Azure Credential Chain Benefits
-
-- **Simplified Authentication**: No need to manage API keys
-- **Enhanced Security**: Leverage Azure's robust identity and access management
-- **Token Auto-renewal**: Credentials are automatically refreshed
-- **Integrated Identity Management**: Works with Azure Active Directory roles and permissions
-
-### Configuration Parameters
-
-| Parameter | Required | Description |
-|-----------|----------|-------------|
-| `AZURE_OPENAI_ENDPOINT` | Yes | Your Azure OpenAI service endpoint URL |
-| `AZURE_OPENAI_DEPLOYMENT_NAME` | Yes | The name of your model deployment |
-| `AZURE_OPENAI_API_VERSION` | No | API version (defaults to "2024-10-21") |
-| `AZURE_OPENAI_API_KEY` | No | API key (if not provided, Azure credential chain will be used) |
-
-### Setup Instructions
-
-<Tabs groupId="azure-auth">
-  <TabItem value="credential-chain" label="Using Azure Credential Chain" default>
-    
-    **Prerequisites**:
-    1. Ensure you have the Azure CLI installed: [Install Azure CLI](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli)
-    2. Log in to your Azure account:
-       ```sh
-       az login
-       ```
-    3. Verify you have appropriate permissions for the Azure OpenAI service
-    
-    **Configuration**:
-    1. Run `goose configure`
-    2. Select `Configure Providers`
-    3. Choose `Azure OpenAI` as the provider
-    4. Enter your Azure OpenAI endpoint and deployment name
-    5. Leave the API key field empty to use Azure credential chain
-    6. Select your model of choice
-    
-    ```bash
-    # Example configuration
-    AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com
-    AZURE_OPENAI_DEPLOYMENT_NAME=your-deployment-name
-    # No API key needed - will use Azure credential chain
-    ```
-  </TabItem>
-  
-  <TabItem value="api-key" label="Using API Key">
-    
-    **Configuration**:
-    1. Obtain your API key from the Azure portal
-    2. Run `goose configure`
-    3. Select `Configure Providers`
-    4. Choose `Azure OpenAI` as the provider
-    5. Enter your Azure OpenAI endpoint, deployment name, and API key
-    6. Select your model of choice
-    
-    ```bash
-    # Example configuration
-    AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com
-    AZURE_OPENAI_DEPLOYMENT_NAME=your-deployment-name
-    AZURE_OPENAI_API_KEY=your-api-key
-    ```
-  </TabItem>
-</Tabs>
-
-### Troubleshooting Azure Authentication
-
-If you encounter authentication issues:
-
-1. **For Credential Chain**:
-   - Ensure you're logged in with `az login`
-   - Verify your account has appropriate role assignments (e.g., "Cognitive Services OpenAI User")
-   - Check that your Azure subscription has access to the Azure OpenAI service
-
-2. **For API Key**:
-   - Verify your API key is correct and has not expired
-   - Ensure the API key has appropriate permissions for the deployment
-   - Check if IP restrictions are in place for your Azure OpenAI service
-
-:::tip
-You can switch between authentication methods at any time by running `goose configure` again and either providing or omitting the API key.
-:::
-
 ## Using Goose for Free
 
 Goose is a free and open source AI agent that you can start using right away, but not all supported [LLM Providers][providers] provide a free tier. 
@@ -436,8 +347,8 @@ For Ollama, if you don't provide a host, we set it to `localhost:11434`. When co
 │  Ollama 
 │
 ◇  Provider Ollama requires OLLAMA_HOST, please enter a value
-│  http://localhost:11434  
-│    
+│  http://localhost:11434
+│
 ◇  Enter a model from that provider:
 │  qwen2.5
 │
@@ -546,6 +457,20 @@ ollama run michaelneale/deepseek-r1-goose
     5. Enter `michaelneale/deepseek-r1-goose` for the model name.
   </TabItem>
 </Tabs>
+
+## Azure OpenAI Credential Chain
+
+Goose supports two authentication methods for Azure OpenAI:
+
+1. **API Key Authentication** - Uses the `AZURE_OPENAI_API_KEY` for direct authentication
+2. **Azure Credential Chain** - Uses Azure CLI credentials automatically without requiring an API key
+
+To use the Azure Credential Chain:
+- Ensure you're logged in with `az login`
+- Have appropriate Azure role assignments for the Azure OpenAI service
+- Configure with `goose configure` and select Azure OpenAI, leaving the API key field empty
+
+This method simplifies authentication and enhances security for enterprise environments.
 
 ---
 

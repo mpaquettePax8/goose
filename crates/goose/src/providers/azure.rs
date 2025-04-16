@@ -34,6 +34,7 @@ pub struct AzureProvider {
     endpoint: String,
     deployment_name: String,
     api_version: String,
+    model: ModelConfig,
 }
 
 impl Serialize for AzureProvider {
@@ -80,6 +81,7 @@ impl AzureProvider {
             auth,
             deployment_name,
             api_version,
+            model,
         })
     }
 
@@ -233,7 +235,7 @@ impl Provider for AzureProvider {
     }
 
     fn get_model_config(&self) -> ModelConfig {
-        ModelConfig::new(AZURE_DEFAULT_MODEL.to_string())
+        self.model.clone()
     }
 
     #[tracing::instrument(
@@ -246,7 +248,7 @@ impl Provider for AzureProvider {
         messages: &[Message],
         tools: &[Tool],
     ) -> Result<(Message, ProviderUsage), ProviderError> {
-        let payload = create_request(&self.get_model_config(), system, messages, tools, &ImageFormat::OpenAi)?;
+        let payload = create_request(&self.model, system, messages, tools, &ImageFormat::OpenAi)?;
         let response = self.post(payload.clone()).await?;
 
         let message = response_to_message(response.clone())?;
@@ -259,7 +261,7 @@ impl Provider for AzureProvider {
             Err(e) => return Err(e),
         };
         let model = get_model(&response);
-        emit_debug_trace(&self.get_model_config(), &payload, &response, &usage);
+        emit_debug_trace(&self.model, &payload, &response, &usage);
         Ok((message, ProviderUsage::new(model, usage)))
     }
 }

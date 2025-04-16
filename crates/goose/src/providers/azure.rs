@@ -218,7 +218,7 @@ impl Provider for AzureProvider {
         ProviderMetadata::new(
             "azure_openai",
             "Azure OpenAI",
-            "Models through Azure OpenAI Service",
+            "Models through Azure OpenAI Service (uses Azure credential chain by default)",
             "gpt-4o",
             AZURE_OPENAI_KNOWN_MODELS
                 .iter()
@@ -226,7 +226,6 @@ impl Provider for AzureProvider {
                 .collect(),
             AZURE_DOC_URL,
             vec![
-                ConfigKey::new("AZURE_OPENAI_API_KEY", false, true, None),
                 ConfigKey::new("AZURE_OPENAI_ENDPOINT", true, false, None),
                 ConfigKey::new("AZURE_OPENAI_DEPLOYMENT_NAME", true, false, None),
                 ConfigKey::new("AZURE_OPENAI_API_VERSION", true, false, Some("2024-10-21")),

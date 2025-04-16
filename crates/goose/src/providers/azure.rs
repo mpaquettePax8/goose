@@ -1,9 +1,9 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use reqwest::Client;
+use serde::Serialize;
 use serde_json::Value;
 use std::time::Duration;
-use serde::Serialize;
 use tokio::time::sleep;
 
 use super::azureauth::AzureAuth;
@@ -136,26 +136,24 @@ impl AzureProvider {
                     request_builder = request_builder.header("api-key", token_value.clone());
                 }
                 super::azureauth::AzureCredentials::DefaultCredential => {
-                    request_builder = request_builder.header(
-                        "Authorization",
-                        format!("Bearer {}", token_value.clone()),
-                    );
+                    request_builder = request_builder
+                        .header("Authorization", format!("Bearer {}", token_value.clone()));
                 }
             }
 
             let response_result = request_builder.json(&payload).send().await;
-            
-            match response_result {
-                Ok(response) => {
-                    match handle_response_openai_compat(response).await {
-                        Ok(result) => {
-                            return Ok(result);
-                        }
-                        Err(ProviderError::RateLimitExceeded(msg)) => {
-                            attempts += 1;
-                            last_error = Some(ProviderError::RateLimitExceeded(msg.clone()));
 
-                            let retry_after = if let Some(secs) = msg.to_lowercase().find("try again in ") {
+            match response_result {
+                Ok(response) => match handle_response_openai_compat(response).await {
+                    Ok(result) => {
+                        return Ok(result);
+                    }
+                    Err(ProviderError::RateLimitExceeded(msg)) => {
+                        attempts += 1;
+                        last_error = Some(ProviderError::RateLimitExceeded(msg.clone()));
+
+                        let retry_after =
+                            if let Some(secs) = msg.to_lowercase().find("try again in ") {
                                 msg[secs..]
                                     .split_whitespace()
                                     .nth(3)
@@ -165,27 +163,27 @@ impl AzureProvider {
                                 0
                             };
 
-                            let delay = if retry_after > 0 {
-                                Duration::from_secs(retry_after)
-                            } else {
-                                let delay = current_delay.min(DEFAULT_MAX_RETRY_INTERVAL_MS);
-                                current_delay = (current_delay as f64 * DEFAULT_BACKOFF_MULTIPLIER) as u64;
-                                Duration::from_millis(delay)
-                            };
+                        let delay = if retry_after > 0 {
+                            Duration::from_secs(retry_after)
+                        } else {
+                            let delay = current_delay.min(DEFAULT_MAX_RETRY_INTERVAL_MS);
+                            current_delay =
+                                (current_delay as f64 * DEFAULT_BACKOFF_MULTIPLIER) as u64;
+                            Duration::from_millis(delay)
+                        };
 
-                            sleep(delay).await;
-                            continue;
-                        }
-                        Err(e) => {
-                            tracing::error!(
-                                "Error response from Azure OpenAI (attempt {}): {:?}",
-                                attempts + 1,
-                                e
-                            );
-                            return Err(e);
-                        }
+                        sleep(delay).await;
+                        continue;
                     }
-                }
+                    Err(e) => {
+                        tracing::error!(
+                            "Error response from Azure OpenAI (attempt {}): {:?}",
+                            attempts + 1,
+                            e
+                        );
+                        return Err(e);
+                    }
+                },
                 Err(e) => {
                     tracing::error!(
                         "Request failed (attempt {}): {:?}\nIs timeout: {}\nIs connect: {}\nIs request: {}",
@@ -195,7 +193,7 @@ impl AzureProvider {
                         e.is_connect(),
                         e.is_request(),
                     );
-                    
+
                     // For timeout errors, we should retry
                     if e.is_timeout() {
                         attempts += 1;
@@ -204,8 +202,11 @@ impl AzureProvider {
                         sleep(Duration::from_millis(delay)).await;
                         continue;
                     }
-                    
-                    return Err(ProviderError::RequestFailed(format!("Request failed: {}", e)));
+
+                    return Err(ProviderError::RequestFailed(format!(
+                        "Request failed: {}",
+                        e
+                    )));
                 }
             }
         }

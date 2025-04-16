@@ -1,9 +1,9 @@
+use chrono;
 use serde::Deserialize;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use tokio::sync::RwLock;
 use thiserror::Error;
-use chrono;
+use tokio::sync::RwLock;
 
 /// Represents errors that can occur during Azure authentication.
 #[derive(Debug, thiserror::Error)]
@@ -131,7 +131,12 @@ impl AzureAuth {
 
         // Get new token using Azure CLI credential
         let output = tokio::process::Command::new("az")
-            .args(["account", "get-access-token", "--resource", "https://cognitiveservices.azure.com"])
+            .args([
+                "account",
+                "get-access-token",
+                "--resource",
+                "https://cognitiveservices.azure.com",
+            ])
             .output()
             .await
             .map_err(|e| AuthError::TokenExchange(format!("Failed to execute Azure CLI: {}", e)))?;
@@ -152,9 +157,10 @@ impl AzureAuth {
 
         let expires_at = Instant::now()
             + Duration::from_secs(
-                token_response.expires_on
+                token_response
+                    .expires_on
                     .saturating_sub(chrono::Utc::now().timestamp() as u64)
-                    .saturating_sub(30)
+                    .saturating_sub(30),
             );
 
         *token_guard = Some(CachedToken {
@@ -164,4 +170,4 @@ impl AzureAuth {
 
         Ok(auth_token)
     }
-} 
+}
